@@ -7,7 +7,7 @@ Automated end-of-day systematic trading strategy for **TQQQ** (3× long Nasdaq-1
 The system classifies each trading day into one of four market regimes based on where $NDX sits relative to its 20-day and 250-day moving averages, then selects a sub-strategy rule and computes a position size accordingly. Bollinger Band momentum detection and trend health overlays adjust conviction, while a layered risk management system protects capital.
 
 **Developer**: Kshitij Singla
-**Inspiration**: Modeled after the "Whitelight" approach — EOD trend/momentum system on leveraged Nasdaq ETFs, ~1-2 trades/week.
+**Inspiration**: Modeled after the "Whitelight" approach - EOD trend/momentum system on leveraged Nasdaq ETFs, ~1-2 trades/week.
 
 ### Project Phases
 
@@ -30,14 +30,14 @@ The system classifies each trading day into one of four market regimes based on 
 
 | Regime | Condition | Bias |
 |--------|-----------|------|
-| A — Strong Uptrend | Close > MA_20 AND Close > MA_250 | TQQQ heavy |
-| B — Pullback in Uptrend | Close ≤ MA_20 AND Close > MA_250 | TQQQ moderate |
-| C — Strong Downtrend | Close < MA_20 AND Close ≤ MA_250 | SQQQ heavy |
-| D — Bounce in Downtrend | Close > MA_20 AND Close ≤ MA_250 | SQQQ moderate |
+| A - Strong Uptrend | Close > MA_20 AND Close > MA_250 | TQQQ heavy |
+| B - Pullback in Uptrend | Close ≤ MA_20 AND Close > MA_250 | TQQQ moderate |
+| C - Strong Downtrend | Close < MA_20 AND Close ≤ MA_250 | SQQQ heavy |
+| D - Bounce in Downtrend | Close > MA_20 AND Close ≤ MA_250 | SQQQ moderate |
 
 ### Sub-Strategy Rules
 
-**Long side (Regimes A/B)** — evaluated in priority order:
+**Long side (Regimes A/B)** - evaluated in priority order:
 
 | Rule | Regime | Trigger | Sizing Range |
 |------|--------|---------|-------------|
@@ -46,7 +46,7 @@ The system classifies each trading day into one of four market regimes based on 
 | L2: Shallow Pullback | B | EXT_20 > −3% | 40–50% TQQQ |
 | L1: Trend Following | A | Always in Regime A | 40–80% TQQQ |
 
-**Short side (Regimes C/D)** — evaluated in priority order:
+**Short side (Regimes C/D)** - evaluated in priority order:
 
 | Rule | Regime | Trigger | Sizing Range |
 |------|--------|---------|-------------|
@@ -77,7 +77,7 @@ NDX_Regimewise_Sizing_Strategy/
 ├── rules.py           # Sub-strategy rule selection & base position sizing
 ├── adjustments.py     # Trend health & momentum phase overlays
 ├── engine.py          # Daily decision flow orchestrator (StrategyEngine)
-├── test_leaves.py     # Unit tests — 84 sizing leaves + early exit tests
+├── test_leaves.py     # Unit tests - 84 sizing leaves + early exit tests
 ├── Docs/
 │   ├── Strategy_Rules.pdf   # Authoritative strategy specification (Phase 1)
 └── Inputs/
@@ -142,7 +142,7 @@ results = StrategyEngine(cfg).run(ndx, tqqq, sqqq)
 
 1. **Dollar-based position tracking**: The engine tracks actual dollar amounts (not stale target percentages) so positions drift naturally with returns, giving precise P&L even when the min-trade threshold blocks rebalancing.
 
-2. **Daily loss triggers affect the next day only**: Detected after today's signal is finalized (Step 11b in engine), so they cannot retroactively change today's allocation — matching the PDF's "next trading day" language.
+2. **Daily loss triggers affect the next day only**: Detected after today's signal is finalized (Step 11b in engine), so they cannot retroactively change today's allocation - matching the PDF's "next trading day" language.
 
 3. **S2 break window includes whipsaw days**: The 10-day countdown starts on the break date and does not pause during the whipsaw filter's cash period. This is intentional per the strategy spec.
 
