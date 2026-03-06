@@ -18,13 +18,16 @@ class StrategyEngine:
         self.cfg = cfg or DEFAULT_CONFIG
 
     def run(self, ndx_close: pd.Series, tqqq_close: pd.Series,
-            sqqq_close: pd.Series) -> pd.DataFrame:
+            sqqq_close: pd.Series, tqqq_low: pd.Series = None,
+            sqqq_low: pd.Series = None) -> pd.DataFrame:
         """Run the full strategy on historical data.
 
         Args:
             ndx_close: $NDX daily close (DatetimeIndex)
             tqqq_close: TQQQ daily close (DatetimeIndex)
             sqqq_close: SQQQ daily close (DatetimeIndex)
+            tqqq_low: TQQQ daily low (optional, for intraday stop-loss)
+            sqqq_low: SQQQ daily low (optional, for intraday stop-loss)
 
         Returns:
             DataFrame with daily signals, positions, and equity curve.
@@ -39,12 +42,18 @@ class StrategyEngine:
         ind = ind.loc[common_idx]
         tqqq = tqqq_close.loc[common_idx]
         sqqq = sqqq_close.loc[common_idx]
+        tqqq_lo = tqqq_low.loc[common_idx] if tqqq_low is not None else None
+        sqqq_lo = sqqq_low.loc[common_idx] if sqqq_low is not None else None
 
         # Skip warmup (need ma_long_period + slope lookback days)
         warmup = cfg.ma_long_period + cfg.ma_slope_lookback
         ind = ind.iloc[warmup:]
         tqqq = tqqq.iloc[warmup:]
         sqqq = sqqq.iloc[warmup:]
+        if tqqq_lo is not None:
+            tqqq_lo = tqqq_lo.iloc[warmup:]
+        if sqqq_lo is not None:
+            sqqq_lo = sqqq_lo.iloc[warmup:]
 
         n = len(ind)
         dates = ind.index
@@ -63,6 +72,7 @@ class StrategyEngine:
             "Target_SQQQ_Pct": np.zeros(n),
             "Target_Cash_Pct": np.zeros(n),
             "Whipsaw_Active": [False] * n,
+            "Stop_Triggered": [False] * n,
             "Risk_Mode": [""] * n,
             "Equity": np.zeros(n),
             "Drawdown_Pct": np.zeros(n),
@@ -98,12 +108,44 @@ class StrategyEngine:
             row_dict = row.to_dict()
 
             # =============================================================
+            # STEP 0.5: Intraday Stop-Loss Check (Section 8.6)
+            # Before applying close-based returns, check if the day's low
+            # would have breached the stop threshold. If so, exit at the
+            # threshold level (not the low - assume fill at trigger price).
+            # The EOD system then runs normally and may re-enter at close.
+            # =============================================================
+            stop_triggered_today = False
+            if cfg.intraday_stop_enabled and i > 0:
+                equity_at_open = tqqq_dollars + sqqq_dollars + cash_dollars
+                if equity_at_open > 0:
+                    worst_pnl_pct = 0.0
+                    if tqqq_dollars > 0 and tqqq_lo is not None and tqqq.iloc[i - 1] > 0:
+                        worst_ret = tqqq_lo.iloc[i] / tqqq.iloc[i - 1] - 1
+                        worst_pnl_pct = (tqqq_dollars * worst_ret) / equity_at_open * 100
+                    elif sqqq_dollars > 0 and sqqq_lo is not None and sqqq.iloc[i - 1] > 0:
+                        worst_ret = sqqq_lo.iloc[i] / sqqq.iloc[i - 1] - 1
+                        worst_pnl_pct = (sqqq_dollars * worst_ret) / equity_at_open * 100
+
+                    if worst_pnl_pct < cfg.intraday_stop_threshold:
+                        # Stop fires - exit at threshold level
+                        equity = equity_at_open * (1 + cfg.intraday_stop_threshold / 100)
+                        # Deduct tx cost for liquidation
+                        held_pct = (tqqq_dollars + sqqq_dollars) / equity_at_open * 100
+                        tx_cost = (held_pct / 100.0 * equity) * cfg.tx_cost_bps / 10000.0
+                        equity -= tx_cost
+                        tqqq_dollars = 0.0
+                        sqqq_dollars = 0.0
+                        cash_dollars = equity
+                        stop_triggered_today = True
+
+            # =============================================================
             # STEP 1: Update equity from YESTERDAY's held position
             # The position was set at yesterday's close; today's price
             # change determines P&L. This must happen FIRST, before any
             # signal logic, so that whipsaw/cross days capture their P&L.
+            # Skip if intraday stop already fired (we exited mid-day).
             # =============================================================
-            if i > 0:
+            if i > 0 and not stop_triggered_today:
                 tqqq_ret = (tqqq.iloc[i] / tqqq.iloc[i - 1] - 1) if tqqq.iloc[i - 1] > 0 else 0.0
                 sqqq_ret = (sqqq.iloc[i] / sqqq.iloc[i - 1] - 1) if sqqq.iloc[i - 1] > 0 else 0.0
 
@@ -353,6 +395,7 @@ class StrategyEngine:
             out["Target_SQQQ_Pct"][i] = target_sqqq
             out["Target_Cash_Pct"][i] = target_cash
             out["Whipsaw_Active"][i] = False
+            out["Stop_Triggered"][i] = stop_triggered_today
             out["Risk_Mode"][i] = risk_mode
             out["Equity"][i] = equity
             dd_pct = (equity - peak_equity) / peak_equity * 100 if peak_equity > 0 else 0.0

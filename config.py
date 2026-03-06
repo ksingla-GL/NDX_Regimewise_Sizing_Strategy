@@ -93,7 +93,7 @@ class StrategyConfig:
     daily_loss_consecutive: float = -10.0       # 2 consecutive days
     daily_loss_consec_duration: int = 5         # trading days
 
-    # --- Intraday Stop-Loss (optional) ---
+    # --- Intraday Stop-Loss (optional, Section 8.6) ---
     intraday_stop_enabled: bool = False
     intraday_stop_threshold: float = -10.0
     intraday_monitor_freq_min: int = 5

@@ -65,6 +65,7 @@ The system classifies each trading day into one of four market regimes based on 
 - **Drawdown Circuit Breaker**: −40% → 50% reduction; −50% → full halt.
 - **Daily Loss Limits**: >15% single-day → reduce-only next day; 2 consecutive >10% days → 50% for 5 days.
 - **Min Trade Threshold**: 5% portfolio delta required to rebalance (risk actions exempt).
+- **Intraday Stop-Loss** (optional): If portfolio intraday P&L from prior close breaches threshold (default -10%), liquidate all positions to cash immediately. EOD system still runs at close and may re-enter. Enabled via `intraday_stop_enabled` config flag. Requires TQQQ/SQQQ daily Low prices for backtesting.
 
 ## Repository Structure
 
