@@ -93,9 +93,15 @@ class StrategyConfig:
     daily_loss_consecutive: float = -10.0       # 2 consecutive days
     daily_loss_consec_duration: int = 5         # trading days
 
+    # --- Optimization Toggles ---
+    kill_s3: bool = False                    # cash in Regime D instead of S3
+    vol_filter_short_threshold: float = 0.0  # skip shorting if 20d vol > this (0=disabled)
+
     # --- Intraday Stop-Loss (optional, Section 8.6) ---
     intraday_stop_enabled: bool = False
-    intraday_stop_threshold: float = -10.0
+    intraday_stop_threshold: float = -10.0     # default for both sides
+    intraday_stop_threshold_long: float = 0.0  # override for TQQQ (0 = use default)
+    intraday_stop_threshold_short: float = 0.0 # override for SQQQ (0 = use default)
     intraday_monitor_freq_min: int = 5
 
     def copy(self):

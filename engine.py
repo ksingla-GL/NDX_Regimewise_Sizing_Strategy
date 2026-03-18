@@ -119,16 +119,21 @@ class StrategyEngine:
                 equity_at_open = tqqq_dollars + sqqq_dollars + cash_dollars
                 if equity_at_open > 0:
                     worst_pnl_pct = 0.0
+                    active_sl = cfg.intraday_stop_threshold
                     if tqqq_dollars > 0 and tqqq_lo is not None and tqqq.iloc[i - 1] > 0:
                         worst_ret = tqqq_lo.iloc[i] / tqqq.iloc[i - 1] - 1
                         worst_pnl_pct = (tqqq_dollars * worst_ret) / equity_at_open * 100
+                        if cfg.intraday_stop_threshold_long != 0:
+                            active_sl = cfg.intraday_stop_threshold_long
                     elif sqqq_dollars > 0 and sqqq_lo is not None and sqqq.iloc[i - 1] > 0:
                         worst_ret = sqqq_lo.iloc[i] / sqqq.iloc[i - 1] - 1
                         worst_pnl_pct = (sqqq_dollars * worst_ret) / equity_at_open * 100
+                        if cfg.intraday_stop_threshold_short != 0:
+                            active_sl = cfg.intraday_stop_threshold_short
 
-                    if worst_pnl_pct < cfg.intraday_stop_threshold:
+                    if worst_pnl_pct < active_sl:
                         # Stop fires - exit at threshold level
-                        equity = equity_at_open * (1 + cfg.intraday_stop_threshold / 100)
+                        equity = equity_at_open * (1 + active_sl / 100)
                         # Deduct tx cost for liquidation
                         held_pct = (tqqq_dollars + sqqq_dollars) / equity_at_open * 100
                         tx_cost = (held_pct / 100.0 * equity) * cfg.tx_cost_bps / 10000.0
@@ -275,6 +280,8 @@ class StrategyEngine:
 
             # =============================================================
             # STEP 6: Rule selection & position sizing
+            # With optional overrides: kill_s3 (cash in D),
+            # vol_filter_short_threshold (skip short if vol too high).
             # =============================================================
             side = None
             rule = None
@@ -286,12 +293,27 @@ class StrategyEngine:
                                         row["BB_Lower"], row["EXT_20"], cfg)
                 if rule:
                     base_size = size_long(rule, row_dict, cfg)
+            elif today_regime == "D" and cfg.kill_s3:
+                pass  # cash in Regime D
             elif today_regime in ("C", "D"):
-                side = "short"
-                rule = select_short_rule(today_regime, s2_eligible, cfg)
-                if rule:
-                    base_size = size_short(rule, row_dict, days_since_break,
-                                           row["BB_Expansion"], cfg)
+                # Vol filter: skip short if 20-day realized vol > threshold
+                if cfg.vol_filter_short_threshold > 0 and today_regime == "C" and i >= 20:
+                    recent_rets = ind["Close"].iloc[max(0, i - 20):i].pct_change().dropna()
+                    realized_vol = recent_rets.std() * np.sqrt(252) * 100 if len(recent_rets) > 1 else 0.0
+                    if realized_vol > cfg.vol_filter_short_threshold:
+                        pass  # skip short, stay cash
+                    else:
+                        side = "short"
+                        rule = select_short_rule(today_regime, s2_eligible, cfg)
+                        if rule:
+                            base_size = size_short(rule, row_dict, days_since_break,
+                                                   row["BB_Expansion"], cfg)
+                else:
+                    side = "short"
+                    rule = select_short_rule(today_regime, s2_eligible, cfg)
+                    if rule:
+                        base_size = size_short(rule, row_dict, days_since_break,
+                                               row["BB_Expansion"], cfg)
 
             # =============================================================
             # STEP 7: Post-rule adjustments (Section 7)
