@@ -1,11 +1,6 @@
 """
-Optimization Sweep V1 - Broad diagnostic.
-
-Tests each proposed change in isolation and combined.
+Optimization sweep - tests each proposed change in isolation and combined.
 Outputs a comparison table of CAGR, Max DD, Total Return, and per-rule P&L.
-
-Key finding: L1 is the only profitable rule. Whipsaw=1 is catastrophic.
-Stacking unvalidated changes (scenario 7) destroyed performance.
 """
 
 import sys
