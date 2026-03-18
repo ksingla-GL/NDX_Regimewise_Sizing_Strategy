@@ -3,13 +3,15 @@ Optimization Sweep V2 - Diagnosing and fixing the short side.
 
 Key findings:
   1: SQQQ is the dominant performance drag. Halving all short sizes was
-     the single best V2 move (12.8% CAGR vs 9.2% baseline).
+     the single best move (12.8% CAGR vs 9.2% baseline).
   2: Vol filter (skip shorts when 20d realized vol > 35%) + killing S3
      (cash in Regime D) = 15.7% CAGR, -41.7% MaxDD. Breakthrough combo.
 
 Root cause: SQQQ loses money even in bear regimes due to 3x daily
 rebalancing decay. Decay is worst in high-volatility environments --
 exactly when bear markets are most violent.
+
+Winner: Vol filter 35% + Kill S3 (used as base for V3+).
 """
 
 import sys
